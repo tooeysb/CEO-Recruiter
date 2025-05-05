@@ -67,7 +67,7 @@ const EngagementPage: React.FC = () => {
       <div>
         <PageHeader
           title="Engagement"
-          description="View engagement details and team information"
+          description=""
         />
         
         <div className="p-4 sm:p-6 lg:p-8">
@@ -87,7 +87,7 @@ const EngagementPage: React.FC = () => {
     <div>
       <PageHeader
         title="Engagement Details"
-        description={`Engagement information for ${engagementDetails.client_company}`}
+        description=""
       />
       
       <div className="p-4 sm:p-6 lg:p-8">
@@ -103,30 +103,7 @@ const EngagementPage: React.FC = () => {
                     <h3 className="text-sm font-medium text-gray-500">Client Company</h3>
                     <p className="mt-1 text-lg font-semibold text-gray-900">{engagementDetails.client_company}</p>
                   </div>
-                  
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500">Report Date</h3>
-                    <p className="mt-1 text-lg font-semibold text-gray-900">
-                      {formatDate(engagementDetails.report_date)}
-                    </p>
-                  </div>
-                  
-                  <div className="sm:col-span-2">
-                    <h3 className="text-sm font-medium text-gray-500">Report Title</h3>
-                    <p className="mt-1 text-lg font-semibold text-gray-900">{engagementDetails.report_title}</p>
-                  </div>
                 </div>
-                
-                {engagementDetails.confidentiality_notice && (
-                  <div className="mt-6">
-                    <h3 className="text-sm font-medium text-gray-500">Confidentiality Notice</h3>
-                    <div className="mt-2 p-4 bg-amber-50 border border-amber-200 rounded-md">
-                      <p className="text-sm text-amber-800 whitespace-pre-line">
-                        {engagementDetails.confidentiality_notice}
-                      </p>
-                    </div>
-                  </div>
-                )}
                 
                 <div className="mt-6">
                   <h3 className="text-sm font-medium text-gray-500">Engagement Timeline</h3>

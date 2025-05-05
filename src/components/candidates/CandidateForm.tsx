@@ -15,7 +15,7 @@ interface CandidateFormProps {
 }
 
 const statusOptions = [
-  { value: 'Calibration profile', label: 'Calibration profile' },
+  { value: 'Calibration', label: 'Calibration' },
   { value: 'Sourced', label: 'Sourced' },
   { value: 'Contacted', label: 'Contacted' },
   { value: 'Interview', label: 'Interview' },
@@ -52,7 +52,7 @@ const CandidateForm: React.FC<CandidateFormProps> = ({
     x_com_url: '',
     glassdoor_url: '',
     notes: '',
-    update_status: 'Calibration profile',
+    update_status: 'Calibration',
     disqualified: false,
     dq_reason: '',
     hungry: false,
@@ -67,6 +67,11 @@ const CandidateForm: React.FC<CandidateFormProps> = ({
     global_experience_details: '',
     ...initialValues,
   });
+  
+  // Handle special case for initialization of older data
+  if (formValues.update_status === 'Calibration profile') {
+    formValues.update_status = 'Calibration';
+  }
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -164,7 +169,7 @@ const CandidateForm: React.FC<CandidateFormProps> = ({
           label="Status" 
           name="update_status" 
           options={statusOptions} 
-          value={formValues.update_status || 'Calibration profile'} 
+          value={formValues.update_status || 'Calibration'} 
           onChange={(value) => handleSelectChange('update_status', value)} 
         />
         

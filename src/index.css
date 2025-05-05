@@ -1,3 +1,77 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Hide the red banner/notification at the top of the page */
+.ceo-banner,
+.notification-banner,
+.red-banner,
+div[role="alert"],
+div[class*="banner"],
+div[class*="notification"],
+div[class*="alert"],
+header + div[style*="red"],
+div[style*="background-color: red"],
+div[style*="background-color:#f"],
+div[style*="background-color: #f"] {
+  display: none !important;
+}
+
+/* Target specific text content */
+div:has(> *:contains("Please remove this and the text in it")),
+div:has(> *:contains("Job Title = CEO")) {
+  display: none !important;
+}
+
+/* Hide the CEO text section at the top of the page */
+header + div:has(> :first-child:contains("CEO")),
+header + div:has(> :first-child:contains("Job Title")),
+.bg-red-100, 
+div[class*="bg-red"],
+div:has(> :first-child:contains("Job Title = CEO")),
+#root > div > div > div.bg-white.shadow + div:first-child:not([class*="grid"]),
+header ~ div.bg-white:has(> :first-child:contains("CEO")),
+div:has(> div:contains("Please remove this and the text in it")),
+div.bg-red-500,
+div.border-red-500,
+div:has(> div > div:contains("CEO")):not(.bg-white),
+div.p-4 ~ div:has(> div:contains("CEO")):first-of-type {
+  display: none !important;
+}
+
+/* Target the specific standalone job title section */
+body > div > main > div > div:first-child:not(.grid):not(.p-4):not(.bg-white):not(.shadow),
+.page-title-job,
+div[role="complementary"]:has(~ .candidate-profile) {
+  display: none !important;
+}
+
+/* Directly target the unwanted duplicate header section */
+body > div > div > main > h1 + div,
+.candidate-profile ~ h1,
+div:has(+ .candidate-profile),
+div > h1:contains("Sumit Dhawan") + div,
+div > main > div > h1 + div:contains("CEO"),
+header + div:not(.candidate-profile):not(.p-4):has(> div:contains("CEO")),
+div.candidate-profile + h1:contains("Sumit Dhawan") ~ div:contains("CEO"),
+body > div:not(.candidate-profile) > h1:contains("Sumit Dhawan") + div:contains("CEO"),
+div:not(.candidate-profile):has(> h1:contains("Sumit")) + div:contains("CEO") {
+  display: none !important;
+}
+
+/* Hide the PageHeader in CandidateProfile component when it appears outside the main grid */
+.candidate-profile > div > h1 + div:not(.grid),
+.candidate-profile:first-child + div:contains("CEO"),
+div:not(.p-4) > h2:contains("Sumit Dhawan") + div:contains("CEO") {
+  display: none !important;
+}
+
+/* Explicitly protect legitimate content from being hidden */
+.candidate-profile-card h2,
+.candidate-profile-card div,
+.candidate-profile-card p,
+.candidate-profile-card .text-gray-600,
+.candidate-profile-card .text-gray-900,
+.candidate-profile-grid .text-gray-600:contains("CEO") {
+  display: revert !important;
+}

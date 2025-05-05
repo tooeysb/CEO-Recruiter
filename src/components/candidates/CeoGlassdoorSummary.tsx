@@ -16,13 +16,6 @@ const CeoGlassdoorSummaryComponent: React.FC<CeoGlassdoorSummaryProps> = ({ summ
           <div className="flex items-center">
             <ThumbsUp className="h-5 w-5 text-blue-400 mr-2" />
             <div>
-              <span className="text-sm text-gray-700">CEO: </span>
-              <span className="text-sm font-semibold text-gray-700">{summary.ceo_name}</span>
-            </div>
-          </div>
-          <div className="flex items-center">
-            <ThumbsUp className="h-5 w-5 text-blue-400 mr-2" />
-            <div>
               <span className="text-sm text-gray-700">CEO Approval: </span>
               <span className="text-sm font-semibold text-gray-700">{summary.ceo_approval_rate}%</span>
             </div>

@@ -31,7 +31,8 @@ import {
   Plus,
   Trash2,
   Save,
-  X
+  X,
+  Settings
 } from 'lucide-react';
 import PageHeader from '../components/common/PageHeader';
 import Card from '../components/ui/Card';
@@ -66,6 +67,9 @@ import StandaloneCeoGlassdoorSummary from '../components/candidates/StandaloneCe
 import CandidateIdDisplay from '../components/candidates/CandidateIdDisplay';
 import EndorsersTable from '../components/candidates/EndorsersTable';
 import DetractorsTable from '../components/candidates/DetractorsTable';
+import CallTranscriptsTable from '../components/candidates/CallTranscriptsTable';
+import Modal from '../components/ui/Modal';
+import Input from '../components/ui/Input';
 
 interface EditableTableProps<T> {
   title: string;
@@ -152,6 +156,13 @@ const EditableTable = <T extends { id: string }>({
   );
 };
 
+// Extended type for the candidate form with additional fields
+interface CandidateFormData extends Partial<Candidate> {
+  firstName?: string;
+  lastName?: string;
+  glassdoor_url?: string | null;
+}
+
 const CandidateProfile: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [candidate, setCandidate] = useState<Candidate | null>(null);
@@ -174,6 +185,9 @@ const CandidateProfile: React.FC = () => {
   const [glassdoorReviews, setGlassdoorReviews] = useState<any[]>([]);
   const [glassdoorLoading, setGlassdoorLoading] = useState(true);
   const [glassdoorError, setGlassdoorError] = useState<string | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editedCandidate, setEditedCandidate] = useState<CandidateFormData>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Add a ref to track if component is mounted
   const isMounted = React.useRef(true);
@@ -558,6 +572,73 @@ const CandidateProfile: React.FC = () => {
     }
   };
 
+  const openEditModal = () => {
+    if (candidate) {
+      // Split name into first and last name for the form
+      const nameParts = candidate.name ? candidate.name.split(' ') : ['', ''];
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+      
+      setEditedCandidate({ 
+        ...candidate,
+        firstName, // Add temporary fields for form
+        lastName
+      });
+      setIsEditModalOpen(true);
+    }
+  };
+  
+  const handleCandidateChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target;
+    
+    if (type === 'checkbox') {
+      const checked = (e.target as HTMLInputElement).checked;
+      setEditedCandidate(prev => ({
+        ...prev,
+        [name]: checked
+      }));
+    } else {
+      setEditedCandidate(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
+  };
+  
+  const handleSubmitCandidateEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!editedCandidate || !id) return;
+    
+    setIsSubmitting(true);
+    
+    try {
+      // Combine first and last name before saving
+      const updatedCandidate = {
+        ...editedCandidate,
+        name: `${editedCandidate.firstName || ''} ${editedCandidate.lastName || ''}`.trim(),
+      };
+      
+      // Remove temporary form fields
+      delete updatedCandidate.firstName;
+      delete updatedCandidate.lastName;
+      
+      const { error } = await supabase
+        .from('candidates')
+        .update(updatedCandidate)
+        .eq('id', id);
+        
+      if (error) throw error;
+      
+      setIsEditModalOpen(false);
+      fetchCandidateData();
+    } catch (error) {
+      console.error('Error updating candidate:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -580,18 +661,14 @@ const CandidateProfile: React.FC = () => {
   }
   
   return (
-    <div>
-      <PageHeader
-        title={candidate.name}
-        description={candidate.current_title || 'No current title'}
-      />
-      
+    <div className="candidate-profile">
       <div className="p-4 sm:p-6 lg:p-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main content column - left side */}
-          <div className="lg:col-span-2">
-            {/* Basic Info */}
-            <Card className="mb-6">
+        {/* Grid layout with 3 columns */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Column 1-2 */}
+          <div className="lg:col-span-8 space-y-6">
+            {/* Candidate Profile Card */}
+            <Card className="candidate-profile-card">
               <CardHeader>
                 <div className="flex justify-between">
                   <div className="grid grid-cols-[90px_1fr] gap-6 items-start">
@@ -606,10 +683,18 @@ const CandidateProfile: React.FC = () => {
                       )}
                     </div>
                   </div>
-                  <div>
+                  <div className="flex items-center space-x-2">
                     <Badge variant="default">
                       {candidate.update_status || 'Calibration'}
                     </Badge>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={openEditModal}
+                      aria-label="Edit candidate profile"
+                    >
+                      <Settings size={18} />
+                    </Button>
                   </div>
                 </div>
               </CardHeader>
@@ -650,57 +735,77 @@ const CandidateProfile: React.FC = () => {
                   </div>
                 )}
                 
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {candidate.hungry && (
-                    <Badge variant="primary">Hungry</Badge>
-                  )}
-                  {candidate.humble && (
-                    <Badge variant="primary">Humble</Badge>
-                  )}
-                  {candidate.smart && (
-                    <Badge variant="primary">Smart</Badge>
-                  )}
-                  {candidate.previous_ceo_experience && (
-                    <Badge variant="secondary">CEO Experience</Badge>
-                  )}
-                  {candidate.exec_staff && (
-                    <Badge variant="secondary">Exec Staff</Badge>
-                  )}
-                  {candidate.global_experience && (
-                    <Badge variant="secondary">Global</Badge>
-                  )}
+                {/* Skills & Attributes */}
+                <div className="mt-4">
+                  <h3 className="text-sm font-medium text-gray-700 mb-2">Skills & Attributes</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {candidate.hungry && (
+                      <Badge variant="primary">Hungry</Badge>
+                    )}
+                    {candidate.humble && (
+                      <Badge variant="primary">Humble</Badge>
+                    )}
+                    {candidate.smart && (
+                      <Badge variant="primary">Smart</Badge>
+                    )}
+                    {candidate.previous_ceo_experience && (
+                      <Badge variant="secondary">CEO Experience</Badge>
+                    )}
+                    {candidate.exec_staff && (
+                      <Badge variant="secondary">Exec Staff</Badge>
+                    )}
+                    {candidate.global_experience && (
+                      <Badge variant="secondary">Global</Badge>
+                    )}
+                  </div>
                 </div>
                 
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {candidate.linkedin_url && (
-                    <a
-                      href={candidate.linkedin_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                    >
-                      <ExternalLink className="h-4 w-4 mr-1.5" />
-                      LinkedIn
-                    </a>
-                  )}
-                  
-                  {candidate.x_com_url && (
-                    <a
-                      href={candidate.x_com_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                    >
-                      <ExternalLink className="h-4 w-4 mr-1.5" />
-                      X.com
-                    </a>
-                  )}
+                {/* Contact Links */}
+                <div className="mt-4">
+                  <h3 className="text-sm font-medium text-gray-700 mb-2">Contact Links</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {candidate.linkedin_url && (
+                      <a
+                        href={candidate.linkedin_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      >
+                        <ExternalLink className="h-4 w-4 mr-1.5" />
+                        LinkedIn
+                      </a>
+                    )}
+                    
+                    {candidate.x_com_url && (
+                      <a
+                        href={candidate.x_com_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      >
+                        <ExternalLink className="h-4 w-4 mr-1.5" />
+                        X.com
+                      </a>
+                    )}
+                    
+                    {candidate.glassdoor_url && (
+                      <a
+                        href={candidate.glassdoor_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      >
+                        <ExternalLink className="h-4 w-4 mr-1.5" />
+                        Glassdoor
+                      </a>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>
-
-            {/* Employment History */}
-            <Card className="mb-6">
+            
+            {/* Employment History - Directly below Candidate Profile */}
+            <Card>
               <CardHeader className="flex justify-between items-center">
                 <h2 className="text-lg font-medium text-gray-900">Employment History</h2>
                 <Button variant="outline" size="sm" onClick={() => {/* TODO: Implement add employment */}}>
@@ -746,7 +851,108 @@ const CandidateProfile: React.FC = () => {
                 )}
               </CardContent>
             </Card>
-
+            
+            {/* Notes - Spans Columns 1-2 */}
+            <div className="mt-6">
+              <EditableTable
+                title="Notes"
+                data={notes}
+                columns={[
+                  { key: 'created_at', header: 'Date', render: (date) => formatDate(date) },
+                  { key: 'note_content', header: 'Content' },
+                  { key: 'author', header: 'Author' }
+                ]}
+                onEdit={handleEdit}
+                onDelete={(id) => handleDelete('candidate_notes', id)}
+                onAdd={() => {/* TODO: Implement add note */}}
+                emptyMessage="No notes have been added for this candidate."
+              />
+            </div>
+            
+            {/* Email Communications - Spans Columns 1-2 */}
+            <div className="mt-6">
+              <EditableTable
+                title="Email Communications"
+                data={emails}
+                columns={[
+                  { key: 'sent_at', header: 'Date', render: (date) => formatDate(date) },
+                  { key: 'subject', header: 'Subject' },
+                  { key: 'sender', header: 'From' }
+                ]}
+                onEdit={handleEdit}
+                onDelete={(id) => handleDelete('candidate_emails', id)}
+                onAdd={() => {/* TODO: Implement add email */}}
+                emptyMessage="No email communications have been recorded for this candidate."
+              />
+            </div>
+            
+            {/* Call Transcripts - Spans Columns 1-2 */}
+            <div className="mt-6">
+              <CallTranscriptsTable
+                candidateId={id || ''}
+                transcripts={transcripts}
+                onDataChange={fetchCandidateData}
+              />
+            </div>
+          </div>
+          
+          {/* Column 3 */}
+          <div className="lg:col-span-4">
+            {/* Meetings */}
+            <Card className="mb-6">
+              <CardHeader className="flex justify-between items-center">
+                <h2 className="text-lg font-medium text-gray-900">Meetings</h2>
+                <Button variant="outline" size="sm" onClick={() => {/* TODO: Implement add meeting */}}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {meetings.length > 0 ? (
+                  <div className="space-y-4">
+                    {meetings.map((meeting) => (
+                      <div key={meeting.id} className="border rounded-lg p-4 hover:bg-gray-50">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="font-medium text-gray-900">
+                              {formatDate(meeting.meeting_date)}
+                              {meeting.meeting_time && ` at ${meeting.meeting_time}`}
+                            </div>
+                            <p className="text-sm text-gray-600">{meeting.location}</p>
+                            {meeting.is_virtual && (
+                              <Badge variant="secondary" className="mt-1">Virtual</Badge>
+                            )}
+                          </div>
+                          <div className="flex space-x-2">
+                            <Button variant="ghost" size="sm" onClick={() => handleEdit(meeting)}>
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => handleDelete('meetings', meeting.id)}>
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState
+                    icon={Calendar}
+                    title="No meetings"
+                    description="No meetings have been scheduled for this candidate."
+                  />
+                )}
+              </CardContent>
+            </Card>
+            
+            {/* CEO Glassdoor Summary */}
+            <div className="mb-6">
+              <StandaloneCeoGlassdoorSummary 
+                candidateId={id || ''}
+                employmentIds={employments.map(e => e.id) || []}
+              />
+            </div>
+            
             {/* Education */}
             <Card className="mb-6">
               <CardHeader className="flex justify-between items-center">
@@ -794,7 +1000,65 @@ const CandidateProfile: React.FC = () => {
               </CardContent>
             </Card>
             
-            {/* Glassdoor Reviews - Full width for better vertical layout */}
+            {/* Endorsers */}
+            <div className="mb-6">
+              <EndorsersTable
+                candidateId={id || ''}
+                endorsers={endorsers}
+                onDataChange={fetchCandidateData}
+              />
+            </div>
+            
+            {/* Detractors */}
+            <div className="mb-6">
+              <DetractorsTable
+                candidateId={id || ''}
+                detractors={detractors}
+                onDataChange={fetchCandidateData}
+              />
+            </div>
+            
+            {/* Board Memberships */}
+            <Card className="mb-6">
+              <CardHeader className="flex justify-between items-center">
+                <h2 className="text-lg font-medium text-gray-900">Board Memberships</h2>
+                <Button variant="outline" size="sm" onClick={() => {/* TODO: Implement add board membership */}}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {boardMemberships.length > 0 ? (
+                  <div className="space-y-4">
+                    {boardMemberships.map((board) => (
+                      <div key={`${board.candidate_id}-${board.organization_name}`} className="border rounded-lg p-4 hover:bg-gray-50">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="font-medium text-gray-900">{board.organization_name}</h3>
+                            <p className="text-sm text-gray-600">{board.role}</p>
+                          </div>
+                        </div>
+                        <div className="mt-2 flex items-center text-sm text-gray-500">
+                          <Calendar className="h-4 w-4 mr-1" />
+                          {board.start_year} - {board.end_year || 'Present'}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState
+                    icon={Users}
+                    title="No board memberships"
+                    description="No board memberships have been recorded for this candidate."
+                  />
+                )}
+              </CardContent>
+            </Card>
+          </div>
+          
+          {/* Full-width sections */}
+          <div className="lg:col-span-12">
+            {/* Glassdoor Reviews */}
             <div className="mb-6">
               <GlassdoorReviews 
                 candidateId={id || ''}
@@ -802,7 +1066,7 @@ const CandidateProfile: React.FC = () => {
               />
             </div>
             
-            {/* Reference Information */}
+            {/* Reference Information (at the bottom as administrative info) */}
             <div className="mb-6">
               <CandidateIdDisplay 
                 candidateId={id || ''}
@@ -811,137 +1075,259 @@ const CandidateProfile: React.FC = () => {
               />
             </div>
           </div>
-          
-          {/* Right sidebar */}
-          <div className="lg:col-span-1 space-y-6">
-            {/* CEO Glassdoor Summary */}
-            <StandaloneCeoGlassdoorSummary
-              candidateId={id || ''}
-              employmentIds={employments.map(e => e.id) || []}
-            />
-            
-            {/* Notes */}
-            <EditableTable
-              title="Notes"
-              data={notes}
-              columns={[
-                { key: 'created_at', header: 'Date', render: (date) => formatDate(date) },
-                { key: 'note_content', header: 'Content' },
-                { key: 'author', header: 'Author' }
-              ]}
-              onEdit={handleEdit}
-              onDelete={(id) => handleDelete('candidate_notes', id)}
-              onAdd={() => {/* TODO: Implement add note */}}
-              emptyMessage="No notes have been added for this candidate."
-            />
-            
-            {/* Interests */}
-            <EditableTable
-              title="Interests"
-              data={interests.map((interest, index) => ({ ...interest, id: `interest-${index}` }))}
-              columns={[
-                { key: 'interest_name', header: 'Interest' }
-              ]}
-              onEdit={handleEdit}
-              onDelete={(id) => handleDelete('candidate_interests', id)}
-              onAdd={() => {/* TODO: Implement add interest */}}
-              emptyMessage="No interests have been added for this candidate yet."
-            />
-
-            {/* Board Memberships */}
-            <EditableTable
-              title="Board Memberships"
-              data={boardMemberships.map((membership, index) => ({ ...membership, id: `board-${index}` }))}
-              columns={[
-                { key: 'organization_name', header: 'Organization' },
-                { key: 'role', header: 'Role' },
-                { 
-                  key: 'start_year', 
-                  header: 'Period',
-                  render: (item) => `${item.start_year} - ${item.end_year || 'Present'}`
-                }
-              ]}
-              onEdit={handleEdit}
-              onDelete={(id) => handleDelete('candidate_board_memberships', id)}
-              onAdd={() => {/* TODO: Implement add board membership */}}
-              emptyMessage="No board memberships have been recorded for this candidate."
-            />
-            
-            {/* Endorsers */}
-            <EndorsersTable
-              candidateId={id || ''}
-              endorsers={endorsers}
-              onDataChange={fetchCandidateData}
-            />
-
-            {/* Detractors */}
-            <DetractorsTable
-              candidateId={id || ''}
-              detractors={detractors}
-              onDataChange={fetchCandidateData}
-            />
-            
-            {/* Call Transcripts */}
-            <EditableTable
-              title="Call Transcripts"
-              data={transcripts}
-              columns={[
-                { key: 'call_date', header: 'Date', render: (date) => formatDate(date) },
-                { key: 'transcript_content', header: 'Content' }
-              ]}
-              onEdit={handleEdit}
-              onDelete={(id) => handleDelete('call_transcripts', id)}
-              onAdd={() => {/* TODO: Implement add transcript */}}
-              emptyMessage="No call transcripts have been recorded for this candidate."
-            />
-
-            {/* Email Communications */}
-            <EditableTable
-              title="Email Communications"
-              data={emails}
-              columns={[
-                { key: 'sent_at', header: 'Date', render: (date) => formatDate(date) },
-                { key: 'subject', header: 'Subject' },
-                { key: 'sender', header: 'From' }
-              ]}
-              onEdit={handleEdit}
-              onDelete={(id) => handleDelete('candidate_emails', id)}
-              onAdd={() => {/* TODO: Implement add email */}}
-              emptyMessage="No email communications have been recorded for this candidate."
-            />
-
-            {/* Recommendations */}
-            <EditableTable
-              title="Recommendations"
-              data={recommendations}
-              columns={[
-                { key: 'source', header: 'Source', render: (source) => source?.source_name || 'Unknown' },
-                { key: 'created_at', header: 'Date', render: (date) => formatDate(date) }
-              ]}
-              onEdit={handleEdit}
-              onDelete={(id) => handleDelete('candidate_recommendations', id)}
-              onAdd={() => {/* TODO: Implement add recommendation */}}
-              emptyMessage="No recommendations have been recorded for this candidate."
-            />
-            
-            {/* Meetings */}
-            <EditableTable
-              title="Meetings"
-              data={meetings}
-              columns={[
-                { key: 'meeting_date', header: 'Date', render: (date) => formatDate(date) },
-                { key: 'meeting_time', header: 'Time' },
-                { key: 'location', header: 'Location' },
-                { key: 'is_virtual', header: 'Virtual', render: (isVirtual) => isVirtual ? 'Yes' : 'No' }
-              ]}
-              onEdit={handleEdit}
-              onDelete={(id) => handleDelete('meetings', id)}
-              onAdd={() => {/* TODO: Implement add meeting */}}
-              emptyMessage="No meetings have been scheduled for this candidate."
-            />
-          </div>
         </div>
       </div>
+      
+      {/* Edit Candidate Modal */}
+      <Modal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        title="Edit Candidate Profile"
+        size="lg"
+        className="bg-gray-100" 
+      >
+        <form onSubmit={handleSubmitCandidateEdit} className="space-y-6 bg-gray-100">
+          {/* Basic Info Section */}
+          <div className="bg-gray-100 p-4 rounded-md">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Split name into first and last name */}
+              <Input
+                label="First Name"
+                name="firstName"
+                value={editedCandidate.firstName || ''}
+                onChange={handleCandidateChange}
+                required
+                className="bg-white"
+              />
+              
+              <Input
+                label="Last Name"
+                name="lastName"
+                value={editedCandidate.lastName || ''}
+                onChange={handleCandidateChange}
+                required
+                className="bg-white"
+              />
+              
+              <Input
+                label="Current Title"
+                name="current_title"
+                value={editedCandidate.current_title || ''}
+                onChange={handleCandidateChange}
+                className="bg-white"
+              />
+              
+              <Input
+                label="Current Employer"
+                name="current_employer"
+                value={editedCandidate.current_employer || ''}
+                onChange={handleCandidateChange}
+                className="bg-white"
+              />
+              
+              <Input
+                label="Location"
+                name="location"
+                value={editedCandidate.location || ''}
+                onChange={handleCandidateChange}
+                leftIcon={<MapPin size={16} />}
+                className="bg-white"
+              />
+              
+              <Input
+                label="Industry"
+                name="employer_industry"
+                value={editedCandidate.employer_industry || ''}
+                onChange={handleCandidateChange}
+                leftIcon={<Building size={16} />}
+                className="bg-white"
+              />
+              
+              <Input
+                label="Stock Symbol"
+                name="employer_stock_symbol"
+                value={editedCandidate.employer_stock_symbol || ''}
+                onChange={handleCandidateChange}
+                leftIcon={<Globe size={16} />}
+                className="bg-white"
+              />
+              
+              <Input
+                label="Revenue (USD)"
+                name="employer_revenue_usd"
+                type="number"
+                value={editedCandidate.employer_revenue_usd || ''}
+                onChange={handleCandidateChange}
+                leftIcon={<DollarSign size={16} />}
+                className="bg-white"
+              />
+            </div>
+          </div>
+          
+          {/* Notes Section */}
+          <div className="bg-gray-100 p-4 rounded-md">
+            <div className="w-full">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Notes
+              </label>
+              <textarea
+                name="notes"
+                rows={3}
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm bg-white"
+                value={editedCandidate.notes || ''}
+                onChange={handleCandidateChange}
+              />
+            </div>
+          </div>
+          
+          {/* Skills & Attributes Section */}
+          <div className="bg-gray-50 p-4 rounded-md">
+            <h3 className="text-sm font-medium text-gray-700 mb-4 text-center border-b pb-2">Skills & Attributes</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
+              {/* Left column - Experience attributes */}
+              <div className="space-y-4 flex flex-col justify-start">
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="previous_ceo_experience"
+                    name="previous_ceo_experience"
+                    className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    checked={!!editedCandidate.previous_ceo_experience}
+                    onChange={handleCandidateChange}
+                  />
+                  <label htmlFor="previous_ceo_experience" className="ml-2 block text-sm text-gray-700">
+                    CEO Experience
+                  </label>
+                </div>
+                
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="exec_staff"
+                    name="exec_staff"
+                    className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    checked={!!editedCandidate.exec_staff}
+                    onChange={handleCandidateChange}
+                  />
+                  <label htmlFor="exec_staff" className="ml-2 block text-sm text-gray-700">
+                    Exec Staff
+                  </label>
+                </div>
+                
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="global_experience"
+                    name="global_experience"
+                    className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    checked={!!editedCandidate.global_experience}
+                    onChange={handleCandidateChange}
+                  />
+                  <label htmlFor="global_experience" className="ml-2 block text-sm text-gray-700">
+                    Global Experience
+                  </label>
+                </div>
+              </div>
+              
+              {/* Right column - Personal attributes */}
+              <div className="space-y-4 flex flex-col justify-start">
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="hungry"
+                    name="hungry"
+                    className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    checked={!!editedCandidate.hungry}
+                    onChange={handleCandidateChange}
+                  />
+                  <label htmlFor="hungry" className="ml-2 block text-sm text-gray-700">
+                    Hungry
+                  </label>
+                </div>
+                
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="humble"
+                    name="humble"
+                    className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    checked={!!editedCandidate.humble}
+                    onChange={handleCandidateChange}
+                  />
+                  <label htmlFor="humble" className="ml-2 block text-sm text-gray-700">
+                    Humble
+                  </label>
+                </div>
+                
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="smart"
+                    name="smart"
+                    className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    checked={!!editedCandidate.smart}
+                    onChange={handleCandidateChange}
+                  />
+                  <label htmlFor="smart" className="ml-2 block text-sm text-gray-700">
+                    Smart
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Contact Links Section */}
+          <div className="bg-gray-50 p-4 rounded-md">
+            <h3 className="text-sm font-medium text-gray-700 mb-4 text-center border-b pb-2">Contact Links</h3>
+            <div className="space-y-4">
+              <Input
+                label="LinkedIn URL"
+                name="linkedin_url"
+                value={editedCandidate.linkedin_url || ''}
+                onChange={handleCandidateChange}
+                leftIcon={<ExternalLink size={16} />}
+                className="bg-white"
+              />
+              
+              <Input
+                label="X.com URL"
+                name="x_com_url"
+                value={editedCandidate.x_com_url || ''}
+                onChange={handleCandidateChange}
+                leftIcon={<ExternalLink size={16} />}
+                className="bg-white"
+              />
+              
+              <Input
+                label="Glassdoor URL"
+                name="glassdoor_url"
+                value={editedCandidate.glassdoor_url || ''}
+                onChange={handleCandidateChange}
+                leftIcon={<ExternalLink size={16} />}
+                className="bg-white"
+              />
+            </div>
+          </div>
+          
+          {/* Action Buttons */}
+          <div className="bg-gray-50 p-4 rounded-md flex justify-end space-x-3">
+            <Button
+              variant="outline"
+              onClick={() => setIsEditModalOpen(false)}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            
+            <Button
+              type="submit"
+              isLoading={isSubmitting}
+            >
+              Save Changes
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

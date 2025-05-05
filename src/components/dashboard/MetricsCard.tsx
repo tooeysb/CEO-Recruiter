@@ -1,5 +1,4 @@
 import React from 'react';
-import { ArrowUp, ArrowDown } from 'lucide-react';
 import Card from '../ui/Card';
 
 interface MetricsCardProps {
@@ -15,8 +14,6 @@ const MetricsCard: React.FC<MetricsCardProps> = ({
   title,
   value,
   icon,
-  change,
-  changeText,
   className = '',
 }) => {
   return (
@@ -31,28 +28,6 @@ const MetricsCard: React.FC<MetricsCardProps> = ({
             {icon}
           </div>
         </div>
-        
-        {typeof change !== 'undefined' && (
-          <div className="mt-4 flex items-center">
-            {change > 0 ? (
-              <ArrowUp className="text-emerald-500 h-4 w-4" />
-            ) : change < 0 ? (
-              <ArrowDown className="text-red-500 h-4 w-4" />
-            ) : null}
-            
-            <span
-              className={`text-sm font-medium ${
-                change > 0
-                  ? 'text-emerald-500'
-                  : change < 0
-                  ? 'text-red-500'
-                  : 'text-gray-500'
-              }`}
-            >
-              {Math.abs(change)}% {changeText || (change > 0 ? 'increase' : 'decrease')}
-            </span>
-          </div>
-        )}
       </div>
     </Card>
   );

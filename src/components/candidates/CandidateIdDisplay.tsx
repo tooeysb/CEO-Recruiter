@@ -30,36 +30,32 @@ const CandidateIdDisplay: React.FC<CandidateIdDisplayProps> = ({
       </CardHeader>
       <CardContent>
         <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-          <table className="min-w-full">
-            <tbody>
-              <tr className="border-b border-gray-200">
-                <td className="py-2 px-4 text-sm font-semibold text-gray-600 align-top">Candidate ID:</td>
-                <td className="py-2 px-4 text-sm text-gray-800 font-mono">
-                  {candidateId}
-                </td>
-              </tr>
+          <div className="w-full">
+            <div className="border-b border-gray-200 pb-2 flex">
+              <div className="py-2 px-4 text-sm font-semibold text-gray-600 w-1/3">Candidate ID:</div>
+              <div className="py-2 px-4 text-sm text-gray-800 font-mono w-2/3">{candidateId}</div>
+            </div>
               
-              {employmentIds && employmentIds.length > 0 && (
-                <tr>
-                  <td className="py-2 px-4 text-sm font-semibold text-gray-600 align-top">Employment IDs:</td>
-                  <td className="py-2 px-4">
-                    <div className="space-y-2">
-                      {employmentIds.map((id, index) => {
-                        const companyName = employmentMap.get(id) || 'Unknown Company';
-                        return (
-                          <div key={id} className="text-sm text-gray-800">
-                            <span className="font-semibold">{companyName}</span>
-                            <span className="mx-1">-</span>
-                            <span className="font-mono">{id}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+            {employmentIds && employmentIds.length > 0 && (
+              <div className="flex pt-2">
+                <div className="py-2 px-4 text-sm font-semibold text-gray-600 w-1/3 align-top">Employment IDs:</div>
+                <div className="py-2 px-4 w-2/3">
+                  <div className="space-y-2">
+                    {employmentIds.map((id, index) => {
+                      const companyName = employmentMap.get(id) || 'Unknown Company';
+                      return (
+                        <div key={id} className="text-sm text-gray-800">
+                          <span className="font-semibold">{companyName}</span>
+                          <span className="mx-1">-</span>
+                          <span className="font-mono">{id}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
         
         <div className="mt-3 text-xs text-gray-500">

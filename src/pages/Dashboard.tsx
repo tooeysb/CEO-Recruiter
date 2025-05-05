@@ -83,7 +83,7 @@ const Dashboard: React.FC = () => {
     <div>
       <PageHeader
         title="Dashboard"
-        description="Overview of your recruiting pipeline and metrics"
+        description=""
       />
       
       <div className="p-4 sm:p-6 lg:p-8">
@@ -91,33 +91,25 @@ const Dashboard: React.FC = () => {
           <MetricsCard 
             title="Total Candidates" 
             value={totalCandidates} 
-            icon={<Users size={24} />} 
-            change={15}
-            changeText="from last month"
+            icon={<Users size={24} />}
           />
           
           <MetricsCard 
             title="Active Candidates" 
             value={activeCandidates} 
-            icon={<GitPullRequest size={24} />} 
-            change={8}
-            changeText="from last month"
+            icon={<GitPullRequest size={24} />}
           />
           
           <MetricsCard 
             title="Disqualified" 
             value={disqualifiedCandidates} 
-            icon={<UserX size={24} />} 
-            change={-3}
-            changeText="from last month"
+            icon={<UserX size={24} />}
           />
           
           <MetricsCard 
             title="CEO?" 
             value={ceoExperienceCandidates} 
-            icon={<Star size={24} />} 
-            change={5}
-            changeText="from last month"
+            icon={<Star size={24} />}
           />
         </div>
         
