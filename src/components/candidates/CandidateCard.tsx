@@ -32,36 +32,45 @@ const CandidateCard: React.FC<CandidateCardProps> = ({ candidate }) => {
     <Link to={`/candidates/${candidate.id}`}>
       <Card className="h-full cursor-pointer">
         <div className="p-5">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center space-x-4">
+          {/* Badge positioned at the top right */}
+          <div className="flex justify-end mb-2">
+            <Badge variant={badge.variant}>{badge.label}</Badge>
+          </div>
+          
+          {/* Layout with explicit positioning */}
+          <div className="grid grid-cols-[75px_1fr] gap-4 items-start">
+            <div className="justify-self-start">
               <Avatar name={candidate.name} size="lg" />
-              <div>
-                <h3 className="font-semibold text-lg text-gray-900">{candidate.name}</h3>
-                <p className="text-sm text-gray-600">{candidate.current_title || 'No title'}</p>
+            </div>
+            <div className="min-w-0">
+              <h3 className="font-semibold text-lg text-gray-900 truncate">{candidate.name}</h3>
+              <div className="text-sm text-gray-600">
+                {candidate.current_title && (
+                  <div className="line-clamp-2">{candidate.current_title}</div>
+                )}
               </div>
             </div>
-            <Badge variant={badge.variant}>{badge.label}</Badge>
           </div>
           
           <div className="mt-4 space-y-2">
             {candidate.location && (
               <div className="flex items-center text-sm text-gray-500">
                 <MapPin size={16} className="mr-2 flex-shrink-0" />
-                <span>{candidate.location}</span>
+                <span className="truncate">{candidate.location}</span>
               </div>
             )}
             
             {candidate.current_employer && (
               <div className="flex items-center text-sm text-gray-500">
                 <Building size={16} className="mr-2 flex-shrink-0" />
-                <span>{candidate.current_employer}</span>
+                <span className="truncate">{candidate.current_employer}</span>
               </div>
             )}
             
             {candidate.employer_industry && (
               <div className="flex items-center text-sm text-gray-500">
                 <Briefcase size={16} className="mr-2 flex-shrink-0" />
-                <span>{candidate.employer_industry}</span>
+                <span className="truncate">{candidate.employer_industry}</span>
               </div>
             )}
           </div>

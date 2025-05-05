@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Loader } from '@googlemaps/js-api-loader';
 import { Candidate } from '../../types/database.types';
 import { AlertCircle, Loader2 } from 'lucide-react';
-import { Card } from '../ui/Card';
+import Card from '../ui/Card';
 import Button from '../ui/Button';
 
 interface CandidatesMapProps {
@@ -116,7 +116,10 @@ const CandidatesMap: React.FC<CandidatesMapProps> = ({ candidates }) => {
         if (!bounds.isEmpty()) {
           map.fitBounds(bounds);
           // Zoom out slightly for better context
-          map.setZoom(map.getZoom() - 1);
+          const currentZoom = map.getZoom();
+          if (currentZoom !== undefined) {
+            map.setZoom(currentZoom - 1);
+          }
         }
 
         setIsLoading(false);

@@ -187,13 +187,42 @@ export type CandidateInterest = {
 };
 
 export type CeoGlassdoorSummary = {
-  id: string;
+  summary_id: string;
   employment_id: string;
+  overall_rating: number;
   total_reviews: number;
-  average_rating: number;
-  approval_percentage: number;
-  recommend_percentage: number;
-  positive_outlook_percentage: number;
+  recommendation_rate: number;
+  ceo_name: string;
+  ceo_approval_rate: number;
+  business_outlook_positive: number;
+  culture_and_values: number;
+  diversity_equity_inclusion: number;
+  work_life_balance: number;
+  senior_management: number;
+  compensation_and_benefits: number;
+  career_opportunities: number;
+  five_star_percentage: number;
+  four_star_percentage: number;
+  three_star_percentage: number;
+  two_star_percentage: number;
+  one_star_percentage: number;
   created_at: string;
   updated_at: string;
 };
+
+export interface GlassdoorReview {
+  id: string;
+  candidate_id: string;
+  employment_id: string;
+  review_rating: number;
+  review_date: string;
+  review_title: string;
+  pros: string | null;
+  cons: string | null;
+  role: string | null;
+  location: string | null;
+  helpful_count: number;
+  review_link: string;
+  created_at: string;
+  updated_at: string;
+}

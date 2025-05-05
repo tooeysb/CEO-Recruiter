@@ -44,12 +44,18 @@ export const formatRevenue = (revenue: number | null): string => {
 // Generate initials from a name
 export const getInitials = (name: string): string => {
   if (!name) return '';
-  return name
-    .split(' ')
-    .map(part => part[0])
-    .join('')
-    .toUpperCase()
-    .substring(0, 2);
+  
+  const parts = name.split(' ').filter(part => part.length > 0);
+  
+  if (parts.length === 0) return '';
+  
+  if (parts.length === 1) {
+    // For single names, take the first two letters of the name
+    return parts[0].substring(0, 2).toUpperCase();
+  }
+  
+  // For multiple names, take first letter of first and first letter of last
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 };
 
 // Get random color based on string (for avatar backgrounds, etc.)

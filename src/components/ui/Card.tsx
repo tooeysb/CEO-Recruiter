@@ -6,7 +6,7 @@ interface CardProps {
   onClick?: () => void;
 }
 
-export const Card: React.FC<CardProps> = ({ className = '', children, onClick }) => {
+const Card: React.FC<CardProps> = ({ className = '', children, onClick }) => {
   return (
     <div 
       className={`bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow ${className}`}
@@ -16,6 +16,8 @@ export const Card: React.FC<CardProps> = ({ className = '', children, onClick })
     </div>
   );
 };
+
+export default Card;
 
 export const CardHeader: React.FC<{ className?: string; children: React.ReactNode }> = ({ 
   className = '', 
@@ -49,5 +51,3 @@ export const CardFooter: React.FC<{ className?: string; children: React.ReactNod
     </div>
   );
 };
-
-export default Card

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { 
   Building, 
   MapPin, 
@@ -25,21 +25,27 @@ import {
   Newspaper,
   PhoneCall,
   ClipboardList,
-  BookOpen
+  BookOpen,
+  ChevronLeft,
+  Edit2,
+  Plus,
+  Trash2,
+  Save,
+  X
 } from 'lucide-react';
 import PageHeader from '../components/common/PageHeader';
-import { Card, CardHeader, CardContent } from '../components/ui/Card';
+import Card from '../components/ui/Card';
+import { CardHeader, CardContent } from '../components/ui/Card';
+import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import Avatar from '../components/ui/Avatar';
-import Button from '../components/ui/Button';
 import EmptyState from '../components/ui/EmptyState';
-import { supabase } from '../lib/supabase';
-import { CeoGlassdoorSummary } from '../components/candidates/CeoGlassdoorSummary';
+import { supabase, testSupabaseConnection } from '../lib/supabase';
+import CeoGlassdoorSummaryComponent from '../components/candidates/CeoGlassdoorSummary';
 import { 
   Candidate, 
   Employment, 
   Education,
-  GlassdoorReview,
   CandidateNote,
   CandidateEmail,
   CallTranscript,
@@ -47,19 +53,110 @@ import {
   CandidateRecommendation,
   CandidateSkill,
   CandidateInterest,
-  CeoReview,
-  CeoGlassdoorSummary as CeoGlassdoorSummaryType
+  CeoGlassdoorSummary as CeoGlassdoorSummaryType,
+  GlassdoorReview,
+  Endorser,
+  Detractor,
+  Meeting
 } from '../types/database.types';
 import { formatRevenue, formatDate } from '../lib/utils';
 import CeoReviews from '../components/candidates/CeoReviews';
+import GlassdoorReviews from '../components/candidates/GlassdoorReviews';
+import StandaloneCeoGlassdoorSummary from '../components/candidates/StandaloneCeoGlassdoorSummary';
+import CandidateIdDisplay from '../components/candidates/CandidateIdDisplay';
+import EndorsersTable from '../components/candidates/EndorsersTable';
+import DetractorsTable from '../components/candidates/DetractorsTable';
+
+interface EditableTableProps<T> {
+  title: string;
+  data: T[];
+  columns: {
+    key: keyof T;
+    header: string;
+    render?: (value: any) => React.ReactNode;
+  }[];
+  onEdit: (item: T) => void;
+  onDelete: (id: string) => void;
+  onAdd: () => void;
+  emptyMessage: string;
+}
+
+const EditableTable = <T extends { id: string }>({
+  title,
+  data,
+  columns,
+  onEdit,
+  onDelete,
+  onAdd,
+  emptyMessage
+}: EditableTableProps<T>) => {
+  return (
+    <Card className="mb-6">
+      <CardHeader className="flex justify-between items-center">
+        <h2 className="text-lg font-medium text-gray-900">{title}</h2>
+        <Button variant="outline" size="sm" onClick={onAdd}>
+          <Plus className="h-4 w-4 mr-2" />
+          Add
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {data.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  {columns.map((column) => (
+                    <th
+                      key={column.key as string}
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      {column.header}
+                    </th>
+                  ))}
+                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {data.map((item) => (
+                  <tr key={item.id}>
+                    {columns.map((column) => (
+                      <td key={column.key as string} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {column.render ? column.render(item[column.key]) : String(item[column.key])}
+                      </td>
+                    ))}
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <Button variant="ghost" size="sm" onClick={() => onEdit(item)}>
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => onDelete(item.id)}>
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <EmptyState
+            icon={FileText}
+            title={`No ${title.toLowerCase()}`}
+            description={emptyMessage}
+          />
+        )}
+      </CardContent>
+    </Card>
+  );
+};
 
 const CandidateProfile: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [candidate, setCandidate] = useState<Candidate | null>(null);
   const [employments, setEmployments] = useState<Employment[]>([]);
   const [educations, setEducations] = useState<Education[]>([]);
-  const [reviews, setReviews] = useState<GlassdoorReview[]>([]);
-  const [ceoReviews, setCeoReviews] = useState<CeoReview[]>([]);
   const [notes, setNotes] = useState<CandidateNote[]>([]);
   const [emails, setEmails] = useState<CandidateEmail[]>([]);
   const [transcripts, setTranscripts] = useState<CallTranscript[]>([]);
@@ -67,156 +164,400 @@ const CandidateProfile: React.FC = () => {
   const [recommendations, setRecommendations] = useState<CandidateRecommendation[]>([]);
   const [skills, setSkills] = useState<CandidateSkill[]>([]);
   const [interests, setInterests] = useState<CandidateInterest[]>([]);
+  const [endorsers, setEndorsers] = useState<Endorser[]>([]);
+  const [detractors, setDetractors] = useState<Detractor[]>([]);
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [ceoGlassdoorSummary, setCeoGlassdoorSummary] = useState<CeoGlassdoorSummaryType | null>(null);
+  const [editingItem, setEditingItem] = useState<any>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [glassdoorReviews, setGlassdoorReviews] = useState<any[]>([]);
+  const [glassdoorLoading, setGlassdoorLoading] = useState(true);
+  const [glassdoorError, setGlassdoorError] = useState<string | null>(null);
+  
+  // Add a ref to track if component is mounted
+  const isMounted = React.useRef(true);
   
   useEffect(() => {
+    // Set up cleanup function
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+  
+  const fetchCandidateData = async () => {
     if (!id) return;
     
-    const fetchCandidateData = async () => {
-      setIsLoading(true);
-      try {
-        // Fetch candidate details
-        const { data: candidateData, error: candidateError } = await supabase
-          .from('candidates')
-          .select('*')
-          .eq('id', id)
-          .single();
-          
-        if (candidateError) throw candidateError;
-        setCandidate(candidateData);
+    setIsLoading(true);
+    setGlassdoorLoading(true);
+    setGlassdoorError(null);
+    
+    // Force a re-render to ensure the loading state is displayed
+    setTimeout(() => {
+      // Only update state if component is still mounted
+      if (isMounted.current) {
+        console.log('Forcing re-render for loading state');
+        setGlassdoorLoading(true);
+      }
+    }, 0);
+    
+    try {
+      // Fetch candidate details
+      const { data: candidateData, error: candidateError } = await supabase
+        .from('candidates')
+        .select('*')
+        .eq('id', id)
+        .single();
         
-        // Fetch employment history
-        const { data: employmentsData, error: employmentsError } = await supabase
-          .from('employments')
-          .select('*')
-          .eq('candidate_id', id)
-          .order('start_year', { ascending: false });
-          
-        if (employmentsError) throw employmentsError;
-        setEmployments(employmentsData || []);
-
-        // Fetch Glassdoor reviews
-        const { data: reviewsData, error: reviewsError } = await supabase
-          .from('glassdoor_reviews')
-          .select('*')
-          .eq('candidate_id', id)
-          .order('review_date', { ascending: false });
-
-        if (reviewsError) throw reviewsError;
-        setReviews(reviewsData || []);
+      if (candidateError) throw candidateError;
+      setCandidate(candidateData);
+      
+      // Fetch employment history
+      const { data: employmentsData, error: employmentsError } = await supabase
+        .from('employments')
+        .select('*')
+        .eq('candidate_id', id)
+        .order('start_year', { ascending: false });
         
-        // Fetch education history
-        const { data: educationsData, error: educationsError } = await supabase
-          .from('educations')
-          .select('*')
-          .eq('candidate_id', id)
-          .order('created_at', { ascending: false });
-          
-        if (educationsError) throw educationsError;
-        setEducations(educationsData || []);
+      if (employmentsError) throw employmentsError;
+      setEmployments(employmentsData || []);
+      
+      // Fetch education history
+      const { data: educationsData, error: educationsError } = await supabase
+        .from('educations')
+        .select('*')
+        .eq('candidate_id', id)
+        .order('created_at', { ascending: false });
+        
+      if (educationsError) throw educationsError;
+      setEducations(educationsData || []);
 
-        // Fetch CEO reviews
-        const { data: ceoReviewsData, error: ceoReviewsError } = await supabase
-          .from('ceo_reviews')
-          .select('*')
-          .eq('employment_id', employmentsData?.[0]?.id)
-          .order('review_date', { ascending: false });
-
-        if (ceoReviewsError) throw ceoReviewsError;
-        setCeoReviews(ceoReviewsData || []);
-
-        // Fetch CEO Glassdoor summary
-        if (employmentsData?.[0]?.id) {
+      // Fetch CEO Glassdoor summary
+      if (employmentsData && employmentsData.length > 0) {
+        console.log('Fetching CEO Glassdoor summary for employments:', employmentsData.map(e => e.id));
+        
+        // First check if the table exists and has any data
+        const { data: allSummaries, error: allSummariesError } = await supabase
+          .from('ceo_glassdoor_summary')
+          .select('*');
+        
+        console.log('All CEO Glassdoor summaries in database:', allSummaries);
+        if (allSummariesError) console.error('Error fetching all summaries:', allSummariesError);
+        
+        // Try to find the most recent employment with a Glassdoor summary
+        let foundSummary = false;
+        for (const employment of employmentsData) {
+          console.log(`Checking for summary for employment ID: ${employment.id}`);
           const { data: summaryData, error: summaryError } = await supabase
             .from('ceo_glassdoor_summary')
             .select('*')
-            .eq('employment_id', employmentsData[0].id)
-            .single();
+            .eq('employment_id', employment.id)
+            .maybeSingle();
 
-          if (summaryError && summaryError.code !== 'PGRST116') {
-            throw summaryError;
+          if (summaryError) {
+            console.error(`Error fetching summary for employment ID ${employment.id}:`, summaryError);
+            continue;
           }
-          setCeoGlassdoorSummary(summaryData);
+
+          if (summaryData) {
+            console.log(`Found summary for employment ID ${employment.id}:`, summaryData);
+            setCeoGlassdoorSummary(summaryData);
+            foundSummary = true;
+            break;
+          }
         }
+        
+        if (!foundSummary) {
+          console.log('No CEO Glassdoor summary found for any employment');
+        }
+      } else {
+        console.log('No employments found, cannot fetch CEO Glassdoor summary');
+      }
 
-        // Fetch notes
-        const { data: notesData, error: notesError } = await supabase
-          .from('candidate_notes')
+      // Fetch notes
+      const { data: notesData, error: notesError } = await supabase
+        .from('candidate_notes')
+        .select('*')
+        .eq('candidate_id', id)
+        .order('created_at', { ascending: false });
+
+      if (notesError) throw notesError;
+      setNotes(notesData || []);
+
+      // Fetch emails
+      const { data: emailsData, error: emailsError } = await supabase
+        .from('candidate_emails')
+        .select('*')
+        .eq('candidate_id', id)
+        .order('sent_at', { ascending: false });
+
+      if (emailsError) throw emailsError;
+      setEmails(emailsData || []);
+
+      // Fetch call transcripts
+      const { data: transcriptsData, error: transcriptsError } = await supabase
+        .from('call_transcripts')
+        .select('*')
+        .eq('candidate_id', id)
+        .order('call_date', { ascending: false });
+
+      if (transcriptsError) throw transcriptsError;
+      setTranscripts(transcriptsData || []);
+
+      // Fetch board memberships
+      const { data: boardData, error: boardError } = await supabase
+        .from('candidate_board_memberships')
+        .select('*')
+        .eq('candidate_id', id)
+        .order('start_year', { ascending: false });
+
+      if (boardError) throw boardError;
+      setBoardMemberships(boardData || []);
+
+      // Fetch recommendations with source details
+      const { data: recommendationsData, error: recommendationsError } = await supabase
+        .from('candidate_recommendations')
+        .select('*, source:recommendation_sources(*)')
+        .eq('candidate_id', id);
+
+      if (recommendationsError) throw recommendationsError;
+      setRecommendations(recommendationsData || []);
+
+      // Fetch skills
+      const { data: skillsData, error: skillsError } = await supabase
+        .from('candidate_skills')
+        .select('*')
+        .eq('candidate_id', id);
+
+      if (skillsError) throw skillsError;
+      setSkills(skillsData || []);
+
+      // Fetch interests
+      const { data: interestsData, error: interestsError } = await supabase
+        .from('candidate_interests')
+        .select('*')
+        .eq('candidate_id', id);
+
+      if (interestsError) throw interestsError;
+      setInterests(interestsData || []);
+
+      // Fetch endorsers
+      const { data: endorsersData, error: endorsersError } = await supabase
+        .from('endorsers')
+        .select('*')
+        .eq('candidate_id', id);
+
+      if (endorsersError) throw endorsersError;
+      setEndorsers(endorsersData || []);
+
+      // Fetch detractors
+      const { data: detractorsData, error: detractorsError } = await supabase
+        .from('detractors')
+        .select('*')
+        .eq('candidate_id', id);
+
+      if (detractorsError) throw detractorsError;
+      setDetractors(detractorsData || []);
+
+      // Fetch meetings
+      const { data: meetingsData, error: meetingsError } = await supabase
+        .from('meetings')
+        .select('*')
+        .eq('candidate_id', id)
+        .order('meeting_date', { ascending: false });
+
+      if (meetingsError) throw meetingsError;
+      setMeetings(meetingsData || []);
+
+      // Debug logs for Glassdoor reviews
+      console.log('Fetching Glassdoor reviews for candidate:', id);
+      console.log('Candidate data:', candidateData);
+      console.log('Employments data:', employmentsData);
+
+      // Fetch Glassdoor reviews - simplify for debugging
+      console.log("Simplified Glassdoor reviews fetch - checking both candidate_id and employment_ids");
+      
+      try {
+        // Simple direct query with debugging - directly log everything
+        console.log(`Looking for all glassdoor_reviews (limit 20)`);
+        const { data: allReviews, error: allError } = await supabase
+          .from('glassdoor_reviews')
+          .select();
+        
+        console.log('Glassdoor reviews query result:', { allReviews, allError });
+        
+        if (allError) {
+          console.error('Error fetching all reviews:', allError);
+          setGlassdoorError(`Error fetching all reviews: ${allError.message}`);
+          if (isMounted.current) {
+            setGlassdoorLoading(false);
+            console.log('Loading state set to false after error');
+          }
+          return;
+        }
+        
+        if (allReviews && allReviews.length > 0) {
+          console.log(`Found ${allReviews.length} reviews:`, allReviews);
+          
+          // Directly set the reviews and update loading state
+          setGlassdoorReviews(allReviews as any[]);
+          console.log('Setting glassdoorLoading to false');
+        } else {
+          console.log('No Glassdoor reviews found');
+          setGlassdoorError('No reviews found in the database.');
+        }
+        
+        // Make absolutely sure we update the loading state
+        if (isMounted.current) {
+          setGlassdoorLoading(false);
+          console.log('Final loading state updated to false');
+        }
+      } catch (glassdoorFetchError) {
+        console.error('Error in Glassdoor reviews fetching:', glassdoorFetchError);
+        setGlassdoorError(`General error: ${glassdoorFetchError}`);
+        if (isMounted.current) {
+          setGlassdoorLoading(false);
+          console.log('Loading state set to false after error');
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching candidate data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  useEffect(() => {
+    fetchCandidateData();
+    
+    // Add a direct check for the glassdoor_reviews table
+    const checkGlassdoorTable = async () => {
+      try {
+        console.log("==== GLASSDOOR REVIEWS DIAGNOSTIC TESTS ====");
+        
+        // Test 0: Check Supabase connection
+        console.log("Test 0: Testing general Supabase connectivity");
+        const connTest = await testSupabaseConnection();
+        console.log("Connection test result:", connTest);
+        
+        // Test 1: Check if table exists and count records
+        console.log("Test 1: Checking glassdoor_reviews table...");
+        const { data: countData, error: countError, count } = await supabase
+          .from('glassdoor_reviews')
+          .select('*', { count: 'exact' });
+          
+        if (countError) {
+          console.error("❌ Error accessing glassdoor_reviews table:", countError);
+        } else {
+          console.log(`✅ glassdoor_reviews table exists with ${count} total records`);
+          console.log("Sample data:", countData?.slice(0, 3));
+        }
+        
+        // Test 2: Check for specific candidate ID
+        console.log(`Test 2: Checking glassdoor_reviews for candidate_id = ${id}`);
+        const { data: candidateReviews, error: candidateError } = await supabase
+          .from('glassdoor_reviews')
           .select('*')
-          .eq('candidate_id', id)
-          .order('created_at', { ascending: false });
-
-        if (notesError) throw notesError;
-        setNotes(notesData || []);
-
-        // Fetch emails
-        const { data: emailsData, error: emailsError } = await supabase
-          .from('candidate_emails')
-          .select('*')
-          .eq('candidate_id', id)
-          .order('sent_at', { ascending: false });
-
-        if (emailsError) throw emailsError;
-        setEmails(emailsData || []);
-
-        // Fetch call transcripts
-        const { data: transcriptsData, error: transcriptsError } = await supabase
-          .from('call_transcripts')
-          .select('*')
-          .eq('candidate_id', id)
-          .order('call_date', { ascending: false });
-
-        if (transcriptsError) throw transcriptsError;
-        setTranscripts(transcriptsData || []);
-
-        // Fetch board memberships
-        const { data: boardData, error: boardError } = await supabase
-          .from('candidate_board_memberships')
-          .select('*')
-          .eq('candidate_id', id)
-          .order('start_year', { ascending: false });
-
-        if (boardError) throw boardError;
-        setBoardMemberships(boardData || []);
-
-        // Fetch recommendations with source details
-        const { data: recommendationsData, error: recommendationsError } = await supabase
-          .from('candidate_recommendations')
-          .select('*, source:recommendation_sources(*)')
           .eq('candidate_id', id);
-
-        if (recommendationsError) throw recommendationsError;
-        setRecommendations(recommendationsData || []);
-
-        // Fetch skills
-        const { data: skillsData, error: skillsError } = await supabase
-          .from('candidate_skills')
-          .select('*')
+          
+        if (candidateError) {
+          console.error(`❌ Error fetching reviews by candidate_id = ${id}:`, candidateError);
+        } else {
+          console.log(`✅ Found ${candidateReviews?.length || 0} reviews with candidate_id = ${id}`);
+          if (candidateReviews?.length) {
+            console.log("First review:", candidateReviews[0]);
+          }
+        }
+        
+        // Test 3: Get employment IDs
+        console.log(`Test 3: Getting employment IDs for candidate_id = ${id}`);
+        const { data: employmentData, error: employmentError } = await supabase
+          .from('employments')
+          .select('id')
           .eq('candidate_id', id);
-
-        if (skillsError) throw skillsError;
-        setSkills(skillsData || []);
-
-        // Fetch interests
-        const { data: interestsData, error: interestsError } = await supabase
-          .from('candidate_interests')
-          .select('*')
-          .eq('candidate_id', id);
-
-        if (interestsError) throw interestsError;
-        setInterests(interestsData || []);
-
-      } catch (error) {
-        console.error('Error fetching candidate data:', error);
-      } finally {
-        setIsLoading(false);
+          
+        if (employmentError) {
+          console.error(`❌ Error fetching employments for candidate_id = ${id}:`, employmentError);
+        } else {
+          const empIds = employmentData?.map(e => e.id) || [];
+          console.log(`✅ Found ${empIds.length} employment IDs:`, empIds);
+          
+          // Test 4: Check for reviews by employment
+          if (empIds.length > 0) {
+            console.log(`Test 4: Checking glassdoor_reviews for employment_id IN (${empIds.join(', ')})`);
+            const { data: empReviews, error: empReviewsError } = await supabase
+              .from('glassdoor_reviews')
+              .select('*')
+              .in('employment_id', empIds);
+              
+            if (empReviewsError) {
+              console.error(`❌ Error fetching reviews by employment_id:`, empReviewsError);
+            } else {
+              console.log(`✅ Found ${empReviews?.length || 0} reviews with matching employment_id`);
+              if (empReviews?.length) {
+                console.log("First review:", empReviews[0]);
+              }
+            }
+          }
+        }
+        
+        // Test 5: Check if candidate ID is a UUID
+        try {
+          console.log(`Test 5: Validating candidate ID format: ${id}`);
+          // Try to parse as UUID
+          const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id || '');
+          console.log(`✅ Is candidate ID a valid UUID? ${isValidUUID}`);
+        } catch (err) {
+          console.error("❌ Error validating UUID format:", err);
+        }
+        
+        console.log("==== END DIAGNOSTIC TESTS ====");
+      } catch (err) {
+        console.error("Exception in diagnostics:", err);
       }
     };
     
-    fetchCandidateData();
+    checkGlassdoorTable();
   }, [id]);
   
+  const handleEdit = (item: any) => {
+    setEditingItem(item);
+    setIsEditing(true);
+  };
+
+  const handleDelete = async (table: string, id: string) => {
+    try {
+      const { error } = await supabase
+        .from(table)
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+      
+      // Refresh the data
+      fetchCandidateData();
+    } catch (error) {
+      console.error(`Error deleting from ${table}:`, error);
+    }
+  };
+
+  const handleSave = async (table: string, data: any) => {
+    try {
+      const { error } = await supabase
+        .from(table)
+        .upsert(data);
+      
+      if (error) throw error;
+      
+      setIsEditing(false);
+      setEditingItem(null);
+      // Refresh the data
+      fetchCandidateData();
+    } catch (error) {
+      console.error(`Error saving to ${table}:`, error);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -228,14 +569,12 @@ const CandidateProfile: React.FC = () => {
   
   if (!candidate) {
     return (
-      <div className="p-4 sm:p-6 lg:p-8">
-        <div className="bg-white shadow rounded-lg p-8 text-center">
-          <Users className="mx-auto h-12 w-12 text-gray-300" />
-          <h3 className="mt-2 text-lg font-medium text-gray-900">Candidate Not Found</h3>
-          <p className="mt-1 text-gray-500">
-            The candidate you're looking for doesn't exist or you don't have access.
-          </p>
-        </div>
+      <div className="flex flex-col items-center justify-center h-screen">
+        <h2 className="text-2xl font-bold text-gray-800">Candidate Not Found</h2>
+        <p className="text-gray-600 mb-4">The candidate you're looking for doesn't exist or has been removed.</p>
+        <Link to="/candidates" className="text-blue-600 hover:underline flex items-center">
+          <ChevronLeft size={16} className="mr-1" /> Back to Candidates List
+        </Link>
       </div>
     );
   }
@@ -249,18 +588,28 @@ const CandidateProfile: React.FC = () => {
       
       <div className="p-4 sm:p-6 lg:p-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main content column - left side */}
           <div className="lg:col-span-2">
             {/* Basic Info */}
             <Card className="mb-6">
               <CardHeader>
-                <div className="flex items-center space-x-4">
-                  <Avatar name={candidate.name} size="xl" />
+                <div className="flex justify-between">
+                  <div className="grid grid-cols-[90px_1fr] gap-6 items-start">
+                    <div className="justify-self-start">
+                      <Avatar name={candidate.name} size="xl" />
+                    </div>
+                    <div className="min-w-0">
+                      <h2 className="text-2xl font-bold text-gray-900 truncate">{candidate.name}</h2>
+                      <div className="text-gray-600 line-clamp-2">{candidate.current_title}</div>
+                      {candidate.current_employer && (
+                        <p className="text-gray-500 truncate">{candidate.current_employer}</p>
+                      )}
+                    </div>
+                  </div>
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900">{candidate.name}</h2>
-                    <p className="text-gray-600">{candidate.current_title}</p>
-                    {candidate.current_employer && (
-                      <p className="text-gray-500">{candidate.current_employer}</p>
-                    )}
+                    <Badge variant="default">
+                      {candidate.update_status || 'Calibration'}
+                    </Badge>
                   </div>
                 </div>
               </CardHeader>
@@ -350,259 +699,41 @@ const CandidateProfile: React.FC = () => {
               </CardContent>
             </Card>
 
-            {/* CEO Glassdoor Summary */}
-            <Card className="mb-6">
-              <CardHeader>
-                <h2 className="text-lg font-medium text-gray-900">CEO Glassdoor Summary</h2>
-              </CardHeader>
-              <CardContent>
-                {ceoGlassdoorSummary ? (
-                  <CeoGlassdoorSummary summary={ceoGlassdoorSummary} />
-                ) : (
-                  <EmptyState
-                    icon={Star}
-                    title="No Glassdoor summary"
-                    description="No Glassdoor summary data is available for this candidate."
-                  />
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Skills */}
-            <Card className="mb-6">
-              <CardHeader>
-                <h2 className="text-lg font-medium text-gray-900">Skills</h2>
-              </CardHeader>
-              <CardContent>
-                {skills.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {skills.map((skill) => (
-                      <Badge key={skill.skill_name} variant="primary">
-                        {skill.skill_name}
-                      </Badge>
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyState
-                    icon={Hash}
-                    title="No skills listed"
-                    description="No skills have been added for this candidate yet."
-                  />
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Interests */}
-            <Card className="mb-6">
-              <CardHeader>
-                <h2 className="text-lg font-medium text-gray-900">Interests</h2>
-              </CardHeader>
-              <CardContent>
-                {interests.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {interests.map((interest) => (
-                      <Badge key={interest.interest_name} variant="secondary">
-                        {interest.interest_name}
-                      </Badge>
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyState
-                    icon={Heart}
-                    title="No interests listed"
-                    description="No interests have been added for this candidate yet."
-                  />
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Board Memberships */}
-            <Card className="mb-6">
-              <CardHeader>
-                <h2 className="text-lg font-medium text-gray-900">Board Memberships</h2>
-              </CardHeader>
-              <CardContent>
-                {boardMemberships.length > 0 ? (
-                  <div className="space-y-4">
-                    {boardMemberships.map((membership) => (
-                      <div key={`${membership.organization_name}-${membership.role}`} className="border-b border-gray-200 last:border-0 pb-4 last:pb-0">
-                        <h3 className="font-medium text-gray-900">{membership.organization_name}</h3>
-                        <p className="text-gray-600">{membership.role}</p>
-                        <p className="text-sm text-gray-500">
-                          {membership.start_year} - {membership.end_year || 'Present'}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyState
-                    icon={Handshake}
-                    title="No board memberships"
-                    description="No board memberships have been recorded for this candidate."
-                  />
-                )}
-              </CardContent>
-            </Card>
-
-            {/* CEO Reviews */}
-            <Card className="mb-6">
-              <CardHeader>
-                <h2 className="text-lg font-medium text-gray-900">CEO Reviews</h2>
-              </CardHeader>
-              <CardContent>
-                {ceoReviews.length > 0 ? (
-                  <CeoReviews reviews={ceoReviews} />
-                ) : (
-                  <EmptyState
-                    icon={Star}
-                    title="No CEO reviews"
-                    description="No CEO reviews are available for this candidate."
-                  />
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Call Transcripts */}
-            <Card className="mb-6">
-              <CardHeader>
-                <h2 className="text-lg font-medium text-gray-900">Call Transcripts</h2>
-              </CardHeader>
-              <CardContent>
-                {transcripts.length > 0 ? (
-                  <div className="space-y-6">
-                    {transcripts.map((transcript) => (
-                      <div key={transcript.id} className="border-b border-gray-200 last:border-0 pb-6 last:pb-0">
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm text-gray-500">{formatDate(transcript.call_date)}</p>
-                        </div>
-                        <div className="mt-2">
-                          <p className="text-gray-600 whitespace-pre-line">{transcript.transcript_content}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyState
-                    icon={PhoneCall}
-                    title="No call transcripts"
-                    description="No call transcripts have been recorded for this candidate."
-                  />
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Emails */}
-            <Card className="mb-6">
-              <CardHeader>
-                <h2 className="text-lg font-medium text-gray-900">Email Communications</h2>
-              </CardHeader>
-              <CardContent>
-                {emails.length > 0 ? (
-                  <div className="space-y-6">
-                    {emails.map((email) => (
-                      <div key={email.id} className="border-b border-gray-200 last:border-0 pb-6 last:pb-0">
-                        <div className="flex items-center justify-between">
-                          <h3 className="font-medium text-gray-900">{email.subject || '(No subject)'}</h3>
-                          <p className="text-sm text-gray-500">{formatDate(email.sent_at)}</p>
-                        </div>
-                        <p className="text-sm text-gray-600 mt-1">From: {email.sender}</p>
-                        <p className="text-sm text-gray-600">To: {email.recipient}</p>
-                        {email.body && (
-                          <div className="mt-2">
-                            <p className="text-gray-600 whitespace-pre-line">{email.body}</p>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyState
-                    icon={Mail}
-                    title="No email communications"
-                    description="No email communications have been recorded for this candidate."
-                  />
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Recommendations */}
-            <Card className="mb-6">
-              <CardHeader>
-                <h2 className="text-lg font-medium text-gray-900">Recommendations</h2>
-              </CardHeader>
-              <CardContent>
-                {recommendations.length > 0 ? (
-                  <div className="space-y-2">
-                    {recommendations.map((recommendation) => (
-                      <div key={recommendation.id} className="flex items-center justify-between">
-                        <span className="text-gray-600">{recommendation.source?.source_name}</span>
-                        <Badge variant="success">Recommended</Badge>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyState
-                    icon={UserCheck}
-                    title="No recommendations"
-                    description="No recommendations have been recorded for this candidate."
-                  />
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Notes */}
-            <Card className="mb-6">
-              <CardHeader>
-                <h2 className="text-lg font-medium text-gray-900">Notes</h2>
-              </CardHeader>
-              <CardContent>
-                {notes.length > 0 ? (
-                  <div className="space-y-4">
-                    {notes.map((note) => (
-                      <div key={note.id} className="border-b border-gray-200 last:border-0 pb-4 last:pb-0">
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm text-gray-500">
-                            {note.author && `Added by ${note.author}`}
-                          </p>
-                          <p className="text-sm text-gray-500">{formatDate(note.created_at)}</p>
-                        </div>
-                        <p className="mt-2 text-gray-600">{note.note_content}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyState
-                    icon={FileText}
-                    title="No notes"
-                    description="No notes have been added for this candidate."
-                  />
-                )}
-              </CardContent>
-            </Card>
-
             {/* Employment History */}
             <Card className="mb-6">
-              <CardHeader>
+              <CardHeader className="flex justify-between items-center">
                 <h2 className="text-lg font-medium text-gray-900">Employment History</h2>
+                <Button variant="outline" size="sm" onClick={() => {/* TODO: Implement add employment */}}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add
+                </Button>
               </CardHeader>
               <CardContent>
                 {employments.length > 0 ? (
-                  <div className="space-y-6">
+                  <div className="space-y-4">
                     {employments.map((employment) => (
-                      <div key={employment.id} className="border-b border-gray-200 last:border-0 pb-6 last:pb-0">
-                        <h3 className="font-medium text-gray-900">{employment.title}</h3>
-                        <p className="text-gray-600">{employment.employer_name}</p>
-                        <p className="text-sm text-gray-500">
-                          {employment.start_year} - {employment.end_year || 'Present'}
-                        </p>
-                        {employment.description && (
-                          <p className="mt-2 text-gray-600">{employment.description}</p>
-                        )}
-                        <div className="mt-2 flex items-center space-x-2">
-                          {employment.verified && (
-                            <Badge variant="success">Verified</Badge>
-                          )}
+                      <div key={employment.id} className="border rounded-lg p-4 hover:bg-gray-50">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="font-medium text-gray-900">{employment.employer_name}</h3>
+                            <p className="text-sm text-gray-600">{employment.title}</p>
+                          </div>
+                          <div className="flex space-x-2">
+                            <Button variant="ghost" size="sm" onClick={() => handleEdit(employment)}>
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => handleDelete('employments', employment.id)}>
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </div>
                         </div>
+                        <div className="mt-2 flex items-center text-sm text-gray-500">
+                          <Calendar className="h-4 w-4 mr-1" />
+                          {employment.start_year} - {employment.end_year || 'Present'}
+                        </div>
+                        {employment.description && (
+                          <p className="mt-2 text-sm text-gray-600">{employment.description}</p>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -618,20 +749,37 @@ const CandidateProfile: React.FC = () => {
 
             {/* Education */}
             <Card className="mb-6">
-              <CardHeader>
+              <CardHeader className="flex justify-between items-center">
                 <h2 className="text-lg font-medium text-gray-900">Education</h2>
+                <Button variant="outline" size="sm" onClick={() => {/* TODO: Implement add education */}}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add
+                </Button>
               </CardHeader>
               <CardContent>
                 {educations.length > 0 ? (
                   <div className="space-y-4">
                     {educations.map((education) => (
-                      <div key={education.id}>
-                        <h3 className="font-medium text-gray-900">{education.institution}</h3>
-                        {education.degree && (
-                          <p className="text-gray-600">
-                            {education.degree}
-                            {education.field_of_study && ` in ${education.field_of_study}`}
-                          </p>
+                      <div key={education.id} className="border rounded-lg p-4 hover:bg-gray-50">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="font-medium text-gray-900">{education.institution}</h3>
+                            <p className="text-sm text-gray-600">{education.degree}</p>
+                          </div>
+                          <div className="flex space-x-2">
+                            <Button variant="ghost" size="sm" onClick={() => handleEdit(education)}>
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => handleDelete('educations', education.id)}>
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </div>
+                        </div>
+                        {education.field_of_study && (
+                          <div className="mt-2 flex items-center text-sm text-gray-500">
+                            <GraduationCap className="h-4 w-4 mr-1" />
+                            {education.field_of_study}
+                          </div>
                         )}
                       </div>
                     ))}
@@ -645,60 +793,152 @@ const CandidateProfile: React.FC = () => {
                 )}
               </CardContent>
             </Card>
-
-            {/* Attributes */}
-            {(candidate.hungry_examples || candidate.humble_examples || candidate.smart_examples) && (
-              <Card className="mb-6">
-                <CardHeader>
-                  <h2 className="text-lg font-medium text-gray-900">Attributes</h2>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {candidate.hungry_examples && (
-                      <div>
-                        <h3 className="font-medium text-gray-900 flex items-center">
-                          <ThumbsUp className="h-4 w-4 mr-1.5 text-blue-500" />
-                          Hungry
-                        </h3>
-                        <p className="mt-1 text-gray-600">{candidate.hungry_examples}</p>
-                      </div>
-                    )}
-                    
-                    {candidate.humble_examples && (
-                      <div>
-                        <h3 className="font-medium text-gray-900 flex items-center">
-                          <ThumbsUp className="h-4 w-4 mr-1.5 text-blue-500" />
-                          Humble
-                        </h3>
-                        <p className="mt-1 text-gray-600">{candidate.humble_examples}</p>
-                      </div>
-                    )}
-                    
-                    {candidate.smart_examples && (
-                      <div>
-                        <h3 className="font-medium text-gray-900 flex items-center">
-                          <ThumbsUp className="h-4 w-4 mr-1.5 text-blue-500" />
-                          Smart
-                        </h3>
-                        <p className="mt-1 text-gray-600">{candidate.smart_examples}</p>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
             
-            {/* Global Experience */}
-            {candidate.global_experience && candidate.global_experience_details && (
-              <Card>
-                <CardHeader>
-                  <h2 className="text-lg font-medium text-gray-900">Global Experience</h2>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-gray-600">{candidate.global_experience_details}</p>
-                </CardContent>
-              </Card>
-            )}
+            {/* Glassdoor Reviews - Full width for better vertical layout */}
+            <div className="mb-6">
+              <GlassdoorReviews 
+                candidateId={id || ''}
+                employmentIds={employments.map(e => e.id) || []} 
+              />
+            </div>
+            
+            {/* Reference Information */}
+            <div className="mb-6">
+              <CandidateIdDisplay 
+                candidateId={id || ''}
+                employmentIds={employments.map(e => e.id)}
+                employments={employments}
+              />
+            </div>
+          </div>
+          
+          {/* Right sidebar */}
+          <div className="lg:col-span-1 space-y-6">
+            {/* CEO Glassdoor Summary */}
+            <StandaloneCeoGlassdoorSummary
+              candidateId={id || ''}
+              employmentIds={employments.map(e => e.id) || []}
+            />
+            
+            {/* Notes */}
+            <EditableTable
+              title="Notes"
+              data={notes}
+              columns={[
+                { key: 'created_at', header: 'Date', render: (date) => formatDate(date) },
+                { key: 'note_content', header: 'Content' },
+                { key: 'author', header: 'Author' }
+              ]}
+              onEdit={handleEdit}
+              onDelete={(id) => handleDelete('candidate_notes', id)}
+              onAdd={() => {/* TODO: Implement add note */}}
+              emptyMessage="No notes have been added for this candidate."
+            />
+            
+            {/* Interests */}
+            <EditableTable
+              title="Interests"
+              data={interests.map((interest, index) => ({ ...interest, id: `interest-${index}` }))}
+              columns={[
+                { key: 'interest_name', header: 'Interest' }
+              ]}
+              onEdit={handleEdit}
+              onDelete={(id) => handleDelete('candidate_interests', id)}
+              onAdd={() => {/* TODO: Implement add interest */}}
+              emptyMessage="No interests have been added for this candidate yet."
+            />
+
+            {/* Board Memberships */}
+            <EditableTable
+              title="Board Memberships"
+              data={boardMemberships.map((membership, index) => ({ ...membership, id: `board-${index}` }))}
+              columns={[
+                { key: 'organization_name', header: 'Organization' },
+                { key: 'role', header: 'Role' },
+                { 
+                  key: 'start_year', 
+                  header: 'Period',
+                  render: (item) => `${item.start_year} - ${item.end_year || 'Present'}`
+                }
+              ]}
+              onEdit={handleEdit}
+              onDelete={(id) => handleDelete('candidate_board_memberships', id)}
+              onAdd={() => {/* TODO: Implement add board membership */}}
+              emptyMessage="No board memberships have been recorded for this candidate."
+            />
+            
+            {/* Endorsers */}
+            <EndorsersTable
+              candidateId={id || ''}
+              endorsers={endorsers}
+              onDataChange={fetchCandidateData}
+            />
+
+            {/* Detractors */}
+            <DetractorsTable
+              candidateId={id || ''}
+              detractors={detractors}
+              onDataChange={fetchCandidateData}
+            />
+            
+            {/* Call Transcripts */}
+            <EditableTable
+              title="Call Transcripts"
+              data={transcripts}
+              columns={[
+                { key: 'call_date', header: 'Date', render: (date) => formatDate(date) },
+                { key: 'transcript_content', header: 'Content' }
+              ]}
+              onEdit={handleEdit}
+              onDelete={(id) => handleDelete('call_transcripts', id)}
+              onAdd={() => {/* TODO: Implement add transcript */}}
+              emptyMessage="No call transcripts have been recorded for this candidate."
+            />
+
+            {/* Email Communications */}
+            <EditableTable
+              title="Email Communications"
+              data={emails}
+              columns={[
+                { key: 'sent_at', header: 'Date', render: (date) => formatDate(date) },
+                { key: 'subject', header: 'Subject' },
+                { key: 'sender', header: 'From' }
+              ]}
+              onEdit={handleEdit}
+              onDelete={(id) => handleDelete('candidate_emails', id)}
+              onAdd={() => {/* TODO: Implement add email */}}
+              emptyMessage="No email communications have been recorded for this candidate."
+            />
+
+            {/* Recommendations */}
+            <EditableTable
+              title="Recommendations"
+              data={recommendations}
+              columns={[
+                { key: 'source', header: 'Source', render: (source) => source?.source_name || 'Unknown' },
+                { key: 'created_at', header: 'Date', render: (date) => formatDate(date) }
+              ]}
+              onEdit={handleEdit}
+              onDelete={(id) => handleDelete('candidate_recommendations', id)}
+              onAdd={() => {/* TODO: Implement add recommendation */}}
+              emptyMessage="No recommendations have been recorded for this candidate."
+            />
+            
+            {/* Meetings */}
+            <EditableTable
+              title="Meetings"
+              data={meetings}
+              columns={[
+                { key: 'meeting_date', header: 'Date', render: (date) => formatDate(date) },
+                { key: 'meeting_time', header: 'Time' },
+                { key: 'location', header: 'Location' },
+                { key: 'is_virtual', header: 'Virtual', render: (isVirtual) => isVirtual ? 'Yes' : 'No' }
+              ]}
+              onEdit={handleEdit}
+              onDelete={(id) => handleDelete('meetings', id)}
+              onAdd={() => {/* TODO: Implement add meeting */}}
+              emptyMessage="No meetings have been scheduled for this candidate."
+            />
           </div>
         </div>
       </div>

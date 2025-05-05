@@ -14,6 +14,15 @@ const Avatar: React.FC<AvatarProps> = ({
   size = 'md',
   className = '',
 }) => {
+  // Define more moderate dimensions
+  const dimensions = {
+    xs: { width: '28px', height: '28px', fontSize: '11px' },
+    sm: { width: '36px', height: '36px', fontSize: '13px' },
+    md: { width: '44px', height: '44px', fontSize: '16px' },
+    lg: { width: '56px', height: '56px', fontSize: '20px' },
+    xl: { width: '70px', height: '70px', fontSize: '26px' },
+  };
+  
   const sizeClasses = {
     xs: 'w-6 h-6 text-xs',
     sm: 'w-8 h-8 text-sm',
@@ -27,11 +36,15 @@ const Avatar: React.FC<AvatarProps> = ({
   
   return (
     <div
-      className={`${
-        sizeClasses[size]
-      } flex items-center justify-center rounded-full ${
+      className={`flex items-center justify-center rounded-full aspect-square ${
         imageUrl ? '' : `${bgColorClass} text-white`
       } ${className}`}
+      style={{ 
+        width: dimensions[size].width, 
+        height: dimensions[size].height,
+        display: 'inline-flex',
+        verticalAlign: 'middle'
+      }}
     >
       {imageUrl ? (
         <img
@@ -40,7 +53,20 @@ const Avatar: React.FC<AvatarProps> = ({
           className="w-full h-full object-cover rounded-full"
         />
       ) : (
-        <span className="font-medium">{initials}</span>
+        <span 
+          className="font-medium flex items-center justify-center text-center" 
+          style={{ 
+            fontSize: dimensions[size].fontSize,
+            lineHeight: 1,
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          {initials}
+        </span>
       )}
     </div>
   );

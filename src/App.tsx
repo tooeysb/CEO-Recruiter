@@ -8,6 +8,7 @@ import EngagementPage from './pages/EngagementPage';
 import AdminPage from './pages/AdminPage';
 import LoginPage from './pages/LoginPage';
 import { AuthProvider, useAuth } from './lib/AuthProvider';
+import SupabaseTest from './SupabaseTest';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { session } = useAuth();
@@ -80,6 +81,8 @@ function App() {
               </ProtectedRoute>
             }
           />
+          
+          <Route path="/supabase-test" element={<SupabaseTest />} />
           
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
