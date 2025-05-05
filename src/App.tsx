@@ -4,6 +4,7 @@ import Layout from './components/common/Layout';
 import Dashboard from './pages/Dashboard';
 import CandidatesListPage from './pages/CandidatesListPage';
 import CandidateProfile from './pages/CandidateProfile';
+import CandidateSummary from './pages/CandidateSummary';
 import EngagementPage from './pages/EngagementPage';
 import AdminPage from './pages/AdminPage';
 import LoginPage from './pages/LoginPage';
@@ -55,6 +56,17 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <CandidateProfile />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path="/candidates/:id/summary"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <CandidateSummary />
                 </Layout>
               </ProtectedRoute>
             }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { 
   Building, 
   MapPin, 
@@ -188,6 +188,10 @@ const CandidateProfile: React.FC = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editedCandidate, setEditedCandidate] = useState<CandidateFormData>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // State to track which view is active: profile or summary
+  const [activeView, setActiveView] = useState<'profile' | 'summary'>('profile');
+  const navigate = useNavigate();
   
   // Add a ref to track if component is mounted
   const isMounted = React.useRef(true);
@@ -660,9 +664,32 @@ const CandidateProfile: React.FC = () => {
     );
   }
   
+  // Navigate to the LLM summary page
+  const handleNavigateToSummary = () => {
+    navigate(`/candidates/${id}/summary`);
+  };
+  
   return (
     <div className="candidate-profile">
       <div className="p-4 sm:p-6 lg:p-8">
+        {/* Navigation buttons */}
+        <div className="flex mb-6 border-b pb-3">
+          <div className="flex w-full max-w-4xl mx-auto">
+            <Link 
+              to={`/candidates/${id}`}
+              className="flex-1 py-2 px-4 text-center font-medium rounded-l-md bg-blue-600 text-white"
+            >
+              CEO Profile
+            </Link>
+            <Link
+              to={`/candidates/${id}/summary`}
+              className="flex-1 py-2 px-4 text-center font-medium rounded-r-md bg-white border border-blue-600 text-blue-600 hover:bg-blue-50"
+            >
+              CEO Summary (LLM)
+            </Link>
+          </div>
+        </div>
+
         {/* Grid layout with 3 columns */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Column 1-2 */}

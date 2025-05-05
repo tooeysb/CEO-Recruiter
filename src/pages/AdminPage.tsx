@@ -8,6 +8,7 @@ import Modal from '../components/ui/Modal';
 import { supabase } from '../lib/supabase';
 import { RecommendationSource, CandidateRecommendation } from '../types/database.types';
 import { formatDate } from '../lib/utils';
+import PromptTemplateManager from '../components/admin/PromptTemplateManager';
 
 const AdminPage: React.FC = () => {
   const [sources, setSources] = useState<RecommendationSource[]>([]);
@@ -51,7 +52,7 @@ const AdminPage: React.FC = () => {
       
       // Count usage for each source
       const usage: Record<string, number> = {};
-      data?.forEach((recommendation: CandidateRecommendation) => {
+      data?.forEach((recommendation: { source_id: string; id: string }) => {
         if (recommendation.source_id) {
           usage[recommendation.source_id] = (usage[recommendation.source_id] || 0) + 1;
         }
@@ -167,10 +168,12 @@ const AdminPage: React.FC = () => {
   
   return (
     <div>
-      <PageHeader
-        title="Admin"
-        description="Manage system settings and reference data"
-        actions={
+      <div className="bg-white shadow">
+        <div className="px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Admin</h1>
+            <p className="mt-2 text-sm text-gray-600">Manage system settings and reference data</p>
+          </div>
           <Button
             variant="primary"
             leftIcon={<Plus size={16} />}
@@ -178,10 +181,14 @@ const AdminPage: React.FC = () => {
           >
             Add Source
           </Button>
-        }
-      />
+        </div>
+      </div>
       
       <div className="p-4 sm:p-6 lg:p-8">
+        {/* CEO Prompt Templates */}
+        <PromptTemplateManager />
+        
+        {/* Recommendation Sources */}
         <Card>
           <CardHeader>
             <h2 className="text-lg font-medium text-gray-900">Recommendation Sources</h2>
@@ -250,7 +257,7 @@ const AdminPage: React.FC = () => {
                             className={`text-red-600 hover:text-red-900 ${
                               sourceUsage[source.id] && sourceUsage[source.id] > 0 ? 'opacity-50 cursor-not-allowed' : ''
                             }`}
-                            disabled={sourceUsage[source.id] && sourceUsage[source.id] > 0}
+                            disabled={sourceUsage[source.id] ? sourceUsage[source.id] > 0 : false}
                           >
                             <Trash2 size={16} />
                           </button>

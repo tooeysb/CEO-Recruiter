@@ -46,7 +46,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <div className="max-w-full mx-auto px-4 h-full">
           <div className="flex h-full items-center justify-between">
             {/* Logo */}
-            <Link to="/" className="font-bold text-xl text-blue-600 whitespace-nowrap mr-16">TalentHub</Link>
+            <Link to="/" className="font-bold text-xl text-blue-600 whitespace-nowrap mr-16">Procore's CEOBlueprint</Link>
             
             {/* Main Navigation Items */}
             <div className="flex items-center space-x-8 ml-12">
